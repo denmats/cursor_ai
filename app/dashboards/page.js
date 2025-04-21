@@ -75,7 +75,7 @@ export default function ApiKeysDashboard() {
       setShowCreateModal(false);
 
       // IMPORTANT: Show the full key ONLY this one time using alert (consider a better UX)
-      alert(`Key Created!\nName: ${newlyCreatedKey.name}\nFull Key: ${newlyCreatedKey.full_key}\n\nThis key will only be shown once. Store it securely.`);
+      // alert(`Key Created!\nName: ${newlyCreatedKey.name}\nFull Key: ${newlyCreatedKey.full_key}\n\nThis key will only be shown once. Store it securely.`);
 
     } catch (err) {
       setError(err.message || "An unexpected error occurred while creating the key.");
