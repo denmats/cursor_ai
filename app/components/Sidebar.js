@@ -12,7 +12,7 @@ export default function Sidebar({ isOpen }) { // Remove toggle prop
   // TODO: Implement dynamic active state based on current route
   const navItems = [
     { name: 'Overview', href: '/dashboards', icon: PlaceholderIcon },
-    { name: 'API Playground', href: '/api-playground', icon: PlaceholderIcon }, // Adjust href if needed
+    { name: 'API Playground', href: '/playground', icon: PlaceholderIcon }, // Updated href
     { name: 'Use Cases', href: '/use-cases', icon: PlaceholderIcon },       // Adjust href if needed
     { name: 'My Account', href: '/account', icon: PlaceholderIcon },         // Adjust href if needed
     { name: 'Documentation', href: 'https://docs.tavily.com', icon: PlaceholderIcon, external: true }, // Example external link
