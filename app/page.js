@@ -1,9 +1,51 @@
+'use client';
+
 import Image from "next/image";
+import { useSession, signIn, signOut } from "next-auth/react";
 
 export default function Home() {
+  const { data: session, status } = useSession();
+
+  const handleSignIn = () => {
+    signIn('github');
+  };
+
+  const handleSignOut = () => {
+    signOut();
+  };
+
+  const buttonClasses = "rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto";
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
+    <div className="grid grid-rows-[auto_1fr_auto] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
+      <header className="row-start-1 flex justify-end w-full max-w-5xl">
+        {status === 'loading' ? (
+          <div className="text-sm">Loading...</div>
+        ) : session?.user ? (
+          <div className="flex items-center gap-4">
+            {session.user.image && (
+              <Image
+                src={session.user.image}
+                alt={session.user.name ?? 'User avatar'}
+                width={32}
+                height={32}
+                className="rounded-full"
+              />
+            )}
+            <span className="text-sm hidden sm:inline">
+              Signed in as {session.user.email ?? session.user.name ?? 'User'}
+            </span>
+            <button onClick={handleSignOut} className={buttonClasses}>
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <button onClick={handleSignIn} className={buttonClasses}>
+            Sign in with GitHub
+          </button>
+        )}
+      </header>
+      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start max-w-5xl w-full">
         <Image
           className="dark:invert"
           src="/next.svg"
