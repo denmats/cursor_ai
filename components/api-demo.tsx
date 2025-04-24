@@ -113,7 +113,7 @@ export function ApiDemo() {
             <span className="ml-2 px-2 py-1 rounded bg-gray-500/20 text-gray-300">Ready</span>
           )}
         </div>
-        <Button variant="default" size="default" onClick={handleSendRequest} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white">
+        <Button variant="default" size="default" onClick={handleSendRequest} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer">
           {loading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />

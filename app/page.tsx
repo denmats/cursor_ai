@@ -1,15 +1,29 @@
+'use client';
+
 import Link from "next/link"
+import Image from "next/image";
 import { Github, FileText } from "lucide-react"
+import { useSession, signIn, signOut } from "next-auth/react"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ApiDemo } from "@/components/api-demo"
 
 export default function LandingPage() {
+  const { data: session, status } = useSession();
+
+  const handleSignIn = () => {
+    signIn('github');
+  };
+
+  const handleSignOut = () => {
+    signOut();
+  };
+
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 text-white">
       <header className="sticky top-0 z-50 w-full border-b border-white/10 bg-black/20 backdrop-blur supports-[backdrop-filter]:bg-black/10">
-        <div className="container flex h-16 items-center justify-between">
+        <div className="container mx-auto flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-purple-600 flex items-center justify-center">
               <Github className="h-5 w-5" />
@@ -25,18 +39,55 @@ export default function LandingPage() {
             </Link>
           </nav>
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="default" className="text-white hover:text-white hover:bg-white/10" asChild>
-              <Link href="/login">Sign in</Link>
-            </Button>
-            <Button variant="default" size="default" className="bg-purple-600 hover:bg-purple-700 text-white" asChild>
-              <Link href="/dashboards">Manage API keys →</Link>
-            </Button>
+            {status === 'loading' ? (
+              <div className="text-sm text-gray-400">Loading...</div>
+            ) : session?.user ? (
+              <>
+                {session.user.image && (
+                  <Image
+                    src={session.user.image}
+                    alt={session.user.name ?? 'User avatar'}
+                    width={32}
+                    height={32}
+                    className="rounded-full border border-white/20"
+                  />
+                )}
+                <span className="text-sm font-medium hidden sm:inline">
+                  {session.user.name ?? session.user.email}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="default"
+                  className="text-white hover:text-white hover:bg-white/10"
+                  onClick={handleSignOut}
+                >
+                  Sign out
+                </Button>
+                <Button
+                  variant="default"
+                  size="default"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  asChild
+                >
+                  <Link href="/dashboards">Manage API keys →</Link>
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="default"
+                size="default"
+                className="bg-purple-600 hover:bg-purple-700 text-white cursor-pointer"
+                onClick={handleSignIn}
+              >
+                Sign in with GitHub
+              </Button>
+            )}
           </div>
         </div>
       </header>
       <main className="flex-1">
         <section className="w-full py-12 md:py-24 lg:py-32 xl:py-48">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="flex flex-col items-center text-center space-y-4 md:space-y-8">
               <Badge variant="default" className="bg-purple-600/20 text-purple-300 hover:bg-purple-600/30 border-purple-500/20">
                 API Studio is now in beta
@@ -71,7 +122,7 @@ export default function LandingPage() {
         </section>
 
         <section id="demo" className="w-full py-12 md:py-24 lg:py-32 bg-black/20">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center mb-10">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">Try It Yourself</h2>
@@ -86,7 +137,7 @@ export default function LandingPage() {
         </section>
 
         <section id="pricing" className="w-full py-12 md:py-24 lg:py-32">
-          <div className="container px-4 md:px-6">
+          <div className="container mx-auto px-4 md:px-6">
             <div className="flex flex-col items-center justify-center space-y-4 text-center">
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">Simple, Transparent Pricing</h2>
@@ -281,7 +332,7 @@ export default function LandingPage() {
         </section>
       </main>
       <footer className="w-full border-t border-white/10 py-6 md:py-0">
-        <div className="container flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
+        <div className="container mx-auto flex flex-col items-center justify-between gap-4 md:h-24 md:flex-row">
           <div className="flex items-center gap-2">
             <div className="h-6 w-6 rounded-full bg-purple-600 flex items-center justify-center">
               <Github className="h-3 w-3" />
