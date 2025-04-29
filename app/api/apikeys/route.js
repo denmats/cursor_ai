@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]/route"; // Adjust path if your authOptions is elsewhere
+import { authOptions } from '../../../lib/authOptions'; // Import from the new shared location
 import { supabase } from '@/lib/supabaseClient';
 import { randomBytes } from 'crypto';
 

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]/route"; // Corrected relative path
+import { authOptions } from '../../../../lib/authOptions'; // Corrected relative path
 import { supabase } from '@/lib/supabaseClient';
 
 // PUT handler to update a specific key for the authenticated user
@@ -99,7 +99,7 @@ export async function DELETE(request, { params }) {
         }
 
         // Successfully deleted
-        return NextResponse.json(null, { status: 204 }); // No Content
+        return new NextResponse(null, { status: 204 }); // No Content
 
     } catch (error) {
         console.error(`API Route DELETE /api/apikeys/${id} Error:`, error.message);
