@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { fetchApiKeys, createApiKey, deleteApiKey, updateApiKeyName } from '../../lib/apiKeysService';
 import ApiKeyTable from '../components/ApiKeyTable';
 import CreateKeyModal from '../components/CreateKeyModal';
 import EditKeyModal from '../components/EditKeyModal';
+import NewKeyDisplay from '../components/NewKeyDisplay';
 
 // Placeholder Add icon (replace with actual icon)
 const AddIcon = () => (
@@ -16,16 +16,18 @@ const AddIcon = () => (
 export default function ApiKeysDashboard() {
   const [apiKeys, setApiKeys] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false); // Used for Create/Edit/Delete operations
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
 
   // Modal States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingKey, setEditingKey] = useState(null); // Stores the key being edited
+  const [editingKey, setEditingKey] = useState(null);
 
-  // UI Interaction States
-  const [visibleKeyId, setVisibleKeyId] = useState(null);
+  // State for displaying the newly created key
+  const [newlyCreatedKeyInfo, setNewlyCreatedKeyInfo] = useState(null);
+
+  // UI Interaction State (Copy related)
   const [copiedKeyId, setCopiedKeyId] = useState(null);
 
   // Fetch API Keys on mount
@@ -33,11 +35,18 @@ export default function ApiKeysDashboard() {
     const loadKeys = async () => {
       setIsLoading(true);
       setError(null);
+      setNewlyCreatedKeyInfo(null);
       try {
-        const keys = await fetchApiKeys();
+        const response = await fetch('/api/apikeys');
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+            throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+        }
+        const keys = await response.json();
         setApiKeys(keys);
       } catch (err) {
         setError(err.message || "Failed to load API keys.");
+        console.error("Error loading keys:", err);
       } finally {
         setIsLoading(false);
       }
@@ -48,39 +57,49 @@ export default function ApiKeysDashboard() {
   // --- Handler Functions ---
 
   const handleCreateKey = async (newKeyName) => {
-    setIsSaving(true);
+    if (!newKeyName || !newKeyName.trim()) {
+        setError("Key name cannot be empty.");
+        return;
+    }
+    setIsProcessing(true);
     setError(null);
-
-    // Basic key generation (consider moving to service or backend)
-    const keyNameOrDefault = newKeyName.trim() || `Key-${Date.now().toString().slice(-4)}`;
-    const keyType = 'dev'; // Hardcoded for now
-    const keyPrefix = `dmatsai-${keyType}-`;
-    const randomPart = Math.random().toString(36).substring(2);
-    const fullKey = `${keyPrefix}${Date.now()}${randomPart}`;
-    const previewLength = keyPrefix.length + 8;
-    const keyPreview = `${fullKey.substring(0, previewLength)}**********************`;
-
-    const keyData = {
-        name: keyNameOrDefault,
-        type: keyType,
-        usage: 0,
-        key_preview: keyPreview,
-        full_key: fullKey,
-    };
+    setNewlyCreatedKeyInfo(null);
 
     try {
-      const newlyCreatedKey = await createApiKey(keyData);
-      // Add the new key (returned from service) to the local state
-      setApiKeys(prevKeys => [newlyCreatedKey, ...prevKeys]);
-      setShowCreateModal(false);
+      const response = await fetch('/api/apikeys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name: newKeyName.trim() }),
+      });
 
-      // IMPORTANT: Show the full key ONLY this one time using alert (consider a better UX)
-      // alert(`Key Created!\nName: ${newlyCreatedKey.name}\nFull Key: ${newlyCreatedKey.full_key}\n\nThis key will only be shown once. Store it securely.`);
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Failed to create key (status: ${response.status})`);
+      }
+
+      // IMPORTANT: Show the full key ONLY this one time
+      // Store the necessary info (including fullKey) temporarily
+      setNewlyCreatedKeyInfo({
+          id: responseData.id,
+          name: responseData.name,
+          fullKey: responseData.fullKey
+      });
+
+      // Add the key *without* the fullKey to the main list for the table
+      const keyForTable = { ...responseData };
+      delete keyForTable.fullKey;
+      setApiKeys(prevKeys => [keyForTable, ...prevKeys]);
+
+      setShowCreateModal(false);
 
     } catch (err) {
       setError(err.message || "An unexpected error occurred while creating the key.");
+      console.error("Create key error:", err);
     } finally {
-      setIsSaving(false);
+      setIsProcessing(false);
     }
   };
 
@@ -89,99 +108,130 @@ export default function ApiKeysDashboard() {
     const keyNameToConfirm = keyToDelete ? keyToDelete.name : 'this key';
 
     if (window.confirm(`Are you sure you want to delete '${keyNameToConfirm}'? This action cannot be undone.`)) {
-      setIsSaving(true);
+      setIsProcessing(true);
       setError(null);
       try {
-        await deleteApiKey(id);
-        setApiKeys(prevKeys => prevKeys.filter(key => key.id !== id));
-        if (visibleKeyId === id) {
-          setVisibleKeyId(null); // Hide if it was visible
+        const response = await fetch(`/api/apikeys/${id}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok && response.status !== 204) {
+            const errorData = await response.json().catch(() => ({ error: 'Failed to parse error response' }));
+             throw new Error(errorData.error || `Failed to delete key (status: ${response.status})`);
         }
-        // Add success notification/toast here?
+
+        setApiKeys(prevKeys => prevKeys.filter(key => key.id !== id));
+
       } catch (err) {
         setError(err.message || "An unexpected error occurred while deleting.");
+        console.error("Delete key error:", err);
       } finally {
-        setIsSaving(false);
+        setIsProcessing(false);
       }
     }
   };
 
   const handleSaveChanges = async (id, newName) => {
-    if (!editingKey || id !== editingKey.id) return; // Ensure we are saving the correct key
+    if (!editingKey || id !== editingKey.id || !newName || !newName.trim()) {
+        setError("Invalid data for saving changes.");
+        return;
+    }
 
-    setIsSaving(true);
+    setIsProcessing(true);
     setError(null);
-    const finalNewName = newName.trim() || `Key-${id.slice(-4)}`;
+    const finalNewName = newName.trim();
 
     try {
-      const updatedKeyData = await updateApiKeyName(id, finalNewName);
+        const response = await fetch(`/api/apikeys/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ name: finalNewName }),
+        });
 
-      // Update the key in the local state using the returned data
-      setApiKeys(prevKeys =>
-        prevKeys.map(key =>
-          key.id === id
-            ? { ...key, ...updatedKeyData } // Merge existing and updated data
-            : key
-        )
-      );
-      setShowEditModal(false);
-      setEditingKey(null);
-       // Add success notification/toast here?
+        const responseData = await response.json();
+
+        if (!response.ok) {
+            throw new Error(responseData.error || `Failed to update key (status: ${response.status})`);
+        }
+
+        setApiKeys(prevKeys =>
+            prevKeys.map(key =>
+            key.id === id
+                ? { ...key, ...responseData }
+                : key
+            )
+        );
+        setShowEditModal(false);
+        setEditingKey(null);
+
     } catch (err) {
       setError(err.message || "An unexpected error occurred while saving changes.");
-      // Keep the modal open on error?
+      console.error("Update key error:", err);
     } finally {
-      setIsSaving(false);
+      setIsProcessing(false);
     }
-  };
-
-  const handleToggleKeyVisibility = (id) => {
-    setVisibleKeyId(prevVisibleId => (prevVisibleId === id ? null : id));
   };
 
   const handleCopyKey = async (fullKey, id) => {
     if (!navigator.clipboard) {
-      alert("Clipboard API not available."); // Simple feedback
+      alert("Clipboard API not available in this browser.");
       return;
     }
     try {
       await navigator.clipboard.writeText(fullKey);
       setCopiedKeyId(id);
-      setTimeout(() => setCopiedKeyId(null), 1500); // Reset feedback
+      setTimeout(() => setCopiedKeyId(null), 2000);
     } catch (err) {
       console.error("Failed to copy API key: ", err);
-      alert("Failed to copy key."); // Simple feedback
+      alert("Failed to copy key.");
     }
   };
 
   const handleEditClick = (key) => {
+    setError(null);
+    setNewlyCreatedKeyInfo(null);
     setEditingKey(key);
     setShowEditModal(true);
   };
 
+  const handleOpenCreateModal = () => {
+    setError(null);
+    setNewlyCreatedKeyInfo(null);
+    setShowCreateModal(true);
+  };
+
   const handleCloseCreateModal = () => {
       setShowCreateModal(false);
-      setError(null); // Clear error when closing modal
   };
 
    const handleCloseEditModal = () => {
       setShowEditModal(false);
       setEditingKey(null);
-      setError(null); // Clear error when closing modal
   };
 
   // --- Render Logic ---
   return (
-    // Use a wrapper div if needed, or directly render content
-    // The outer min-h-screen and container were previously here, but might belong in the layout
-    <div className="p-4 sm:p-8"> {/* Padding adjusted from layout */}
+    <div className="p-4 sm:p-8">
 
-      {/* Error Display */}
+      {/* Global Error Display (for API errors etc.) */}
       {error && (
         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded" role="alert">
           <p className="font-bold">Error</p>
           <p>{error}</p>
+           <button onClick={() => setError(null)} className="text-sm text-red-600 hover:text-red-800 ml-4">Dismiss</button>
         </div>
+      )}
+
+       {/* Display Newly Created Key (if available) */}
+      {newlyCreatedKeyInfo && (
+        <NewKeyDisplay
+            keyInfo={newlyCreatedKeyInfo}
+            onDismiss={() => setNewlyCreatedKeyInfo(null)}
+            onCopy={handleCopyKey}
+            copiedKeyId={copiedKeyId}
+        />
       )}
 
       {/* API Keys Section Card */}
@@ -189,29 +239,25 @@ export default function ApiKeysDashboard() {
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-xl font-semibold text-gray-800">API Keys</h2>
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={handleOpenCreateModal}
             className="flex items-center justify-center w-8 h-8 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-md transition duration-150 ease-in-out disabled:opacity-50"
             title="Create New API Key"
-            disabled={isLoading || isSaving} // Disable button during any loading state
+            disabled={isLoading || isProcessing}
           >
             <AddIcon />
           </button>
         </div>
         <p className="text-sm text-gray-500 mb-6">
-          The key is used to authenticate your requests to the API. To learn more, see the <a href="#" className="text-indigo-600 hover:underline">documentation page</a>.
+          Manage API keys used to authenticate requests. Remember to store keys securely.
         </p>
 
-        {/* API Keys Table Component */}
         <ApiKeyTable
             apiKeys={apiKeys}
             isLoading={isLoading}
-            visibleKeyId={visibleKeyId}
-            copiedKeyId={copiedKeyId}
-            onToggleVisibility={handleToggleKeyVisibility}
-            onCopy={handleCopyKey}
+            copiedKeyId={null}
             onEdit={handleEditClick}
             onDelete={handleDeleteKey}
-            isActionDisabled={isSaving} // Disable row actions during create/edit/delete
+            isActionDisabled={isProcessing}
         />
       </div>
 
@@ -220,7 +266,7 @@ export default function ApiKeysDashboard() {
         isOpen={showCreateModal}
         onClose={handleCloseCreateModal}
         onCreate={handleCreateKey}
-        isSaving={isSaving}
+        isSaving={isProcessing}
       />
 
       {/* Edit Key Modal Component */}
@@ -228,8 +274,8 @@ export default function ApiKeysDashboard() {
         isOpen={showEditModal}
         onClose={handleCloseEditModal}
         onSave={handleSaveChanges}
-        isSaving={isSaving}
-        editingKey={editingKey} // Pass the key object being edited
+        isSaving={isProcessing}
+        editingKey={editingKey}
       />
 
     </div>

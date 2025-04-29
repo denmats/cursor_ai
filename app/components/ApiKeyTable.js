@@ -1,50 +1,36 @@
 'use client';
 
-import { useState } from 'react';
-
-// Placeholder icons (replace with actual icons)
-const EyeIcon = () => '👁️';
-const EyeSlashIcon = () => '🔒';
-const ClipboardIcon = () => '📋';
-const CheckIcon = () => '✅';
+// Using simple text for icons for now, replace with actual icon components if available
 const PencilIcon = () => '✏️';
 const TrashIcon = () => '🗑️';
 
-// --- ApiKeyRow Component ---
-function ApiKeyRow({ apiKey, isVisible, isCopied, onToggleVisibility, onCopy, onEdit, onDelete, isActionDisabled }) {
+// --- ApiKeyRow Component (Simplified) ---
+// Removed isVisible, isCopied, onToggleVisibility, onCopy props and related logic
+function ApiKeyRow({ apiKey, onEdit, onDelete, isActionDisabled }) {
   return (
     <tr key={apiKey.id} className="hover:bg-gray-50 transition duration-150 ease-in-out">
-      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-800">{apiKey.name}</td>
-      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{apiKey.type}</td>
-      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">{apiKey.usage}</td>
-      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800 align-middle">
+        {apiKey.name}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 align-middle">
+        {apiKey.type || 'N/A'} {/* Show N/A if type is missing */}
+      </td>
+       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 align-middle">
+        {apiKey.usage !== undefined ? apiKey.usage : 'N/A'} {/* Handle potential missing usage */}
+      </td>
+      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 align-middle">
         <span className="inline-block bg-gray-100 px-3 py-1 rounded-md font-mono text-xs border border-gray-200 shadow-sm">
-          {isVisible ? apiKey.full_key : apiKey.key_preview} {/* Use DB column names */} 
+          {apiKey.key_preview}
         </span>
       </td>
-      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium align-middle">
         <div className="flex items-center space-x-2">
           <button
-            onClick={() => onToggleVisibility(apiKey.id)}
-            title={isVisible ? "Hide Key" : "View Key"}
-            className="p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-            disabled={isActionDisabled}
-          >
-            {isVisible ? <EyeSlashIcon /> : <EyeIcon />}
-          </button>
-          <button
-            onClick={() => onCopy(apiKey.full_key, apiKey.id)} // Use full_key
-            title="Copy Key"
-            className={`p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 ${isCopied ? 'text-green-500' : ''}`}
-            disabled={isActionDisabled}
-          >
-            {isCopied ? <CheckIcon /> : <ClipboardIcon />}
-          </button>
-          <button
             onClick={() => onEdit(apiKey)} // Pass the whole key object
-            title="Edit Key"
+            title="Edit Key Name"
             className="p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
             disabled={isActionDisabled}
+            aria-label={`Edit API key named ${apiKey.name}`}
           >
             <PencilIcon />
           </button>
@@ -53,6 +39,7 @@ function ApiKeyRow({ apiKey, isVisible, isCopied, onToggleVisibility, onCopy, on
             title="Delete Key"
             className="p-1 rounded-md text-red-400 hover:bg-red-100 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
             disabled={isActionDisabled}
+             aria-label={`Delete API key named ${apiKey.name}`}
           >
             <TrashIcon />
           </button>
@@ -62,10 +49,12 @@ function ApiKeyRow({ apiKey, isVisible, isCopied, onToggleVisibility, onCopy, on
   );
 }
 
-// --- ApiKeyTable Component ---
-export default function ApiKeyTable({ apiKeys, isLoading, visibleKeyId, copiedKeyId, onToggleVisibility, onCopy, onEdit, onDelete, isActionDisabled }) {
+// --- ApiKeyTable Component (Simplified) ---
+// Removed visibleKeyId, copiedKeyId, onToggleVisibility, onCopy props
+export default function ApiKeyTable({ apiKeys, isLoading, onEdit, onDelete, isActionDisabled }) {
 
-  if (isLoading && apiKeys.length === 0) {
+  // Loading State
+  if (isLoading) { // Show loading indicator even if there are stale keys visible
     return (
       <div className="min-w-full">
           <div className="px-4 py-4 text-center text-sm text-gray-500">Loading keys...</div>
@@ -73,24 +62,28 @@ export default function ApiKeyTable({ apiKeys, isLoading, visibleKeyId, copiedKe
     );
   }
 
-  if (!isLoading && apiKeys.length === 0) {
+  // Empty State (after loading)
+  if (!apiKeys || apiKeys.length === 0) {
     return (
       <div className="min-w-full">
-        <div className="px-4 py-4 text-center text-sm text-gray-500">No API keys found. Create one to get started.</div>
+        <div className="px-4 py-4 text-center text-sm text-gray-500">
+            No API keys found. Create one using the button above to get started.
+        </div>
       </div>
     );
   }
 
+  // Table Display
   return (
-    <div className="overflow-x-auto">
-        <table className="min-w-full">
-            <thead>
-            <tr className="border-b border-gray-200">
+    <div className="overflow-x-auto border border-gray-200 rounded-md">
+        <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+            <tr>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usage</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Options</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key Preview</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -98,10 +91,6 @@ export default function ApiKeyTable({ apiKeys, isLoading, visibleKeyId, copiedKe
                     <ApiKeyRow
                         key={key.id}
                         apiKey={key}
-                        isVisible={visibleKeyId === key.id}
-                        isCopied={copiedKeyId === key.id}
-                        onToggleVisibility={onToggleVisibility}
-                        onCopy={onCopy}
                         onEdit={onEdit}
                         onDelete={onDelete}
                         isActionDisabled={isActionDisabled}
