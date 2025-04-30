@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { validateApiKey } from '../../../lib/apiKeysService';
+import { validateApiKey, getApiKeyRecord, incrementApiKeyUsage } from '../../../lib/apiKeysService';
 import { getGithubSummary } from '../../../lib/githubSummarizerChain'; // Import the new chain function
 
 // Note: Removed Langchain/Zod imports from here
@@ -16,15 +16,46 @@ export async function POST(request) {
     // Get API key from header
     const apiKey = request.headers.get('x-api-key');
 
-    // --- API Key Validation ---
+    // --- API Key Validation & Rate Limiting ---
     if (!apiKey) {
       return NextResponse.json({ valid: false, error: 'API key is required' }, { status: 400 });
     }
+
+    // 1. Check if the key is fundamentally valid (exists, active, etc.)
     const isValid = await validateApiKey(apiKey);
     if (!isValid) {
        return NextResponse.json({ valid: false, error: 'Invalid API key' }, { status: 401 });
     }
-    // --- End API Key Validation ---
+
+    console.log("valid: "+isValid);
+
+    // 2. Fetch the full record to check usage limits
+    let apiKeyRecord;
+    try {
+        apiKeyRecord = await getApiKeyRecord(apiKey);
+        if (!apiKeyRecord) {
+            // This case should ideally not happen if validateApiKey passed,
+            // but handle it defensively.
+            console.error(`[API Consistency Error] API key ${apiKey} passed validation but record not found.`);
+            return NextResponse.json({ valid: false, error: 'API key validation inconsistency.' }, { status: 500 });
+        }
+    } catch (fetchError) {
+        console.error(`[API Fetch Error] Failed to fetch record for key ${apiKey}:`, fetchError);
+        return NextResponse.json({ valid: false, error: 'Failed to retrieve API key details.' }, { status: 500 });
+    }
+
+
+    // 3. Check if usage exceeds the limit
+    if (apiKeyRecord.usage >= apiKeyRecord.limit) {
+        console.log(`[API Rate Limit] Key ${apiKey} exceeded limit (${apiKeyRecord.usage}/${apiKeyRecord.limit})`);
+        return NextResponse.json({ error: 'API rate limit exceeded' }, { status: 429 }); // 429 Too Many Requests
+    }
+
+    // 4. Increment the usage count (fire-and-forget or await)
+    incrementApiKeyUsage(apiKeyRecord.id).catch(err => {
+        console.error(`[API Usage Increment Error] Failed to increment usage for key ${apiKey}:`, err);
+    });
+    // --- End API Key Validation & Rate Limiting ---
 
     // Validate required fields from body
     const { githubUrl } = body;
@@ -73,7 +104,7 @@ export async function POST(request) {
     // --- End Fetch README Content ---
 
     // --- Call Langchain Summarization Logic ---
-    console.log('[API Github Summarizer] Key validated, proceeding with summarization...');
+    console.log('[API Github Summarizer] Key validated, rate limit checked, proceeding with summarization...');
 
     try {
       // Call the extracted function

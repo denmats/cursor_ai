@@ -23,7 +23,7 @@ export async function GET(request) {
   try {
     const { data, error } = await supabase
       .from('api_keys')
-      .select('id, name, type, key_preview, created_at') // Exclude full_key
+      .select('id, name, type, key_preview, created_at, usage') // Exclude full_key
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
